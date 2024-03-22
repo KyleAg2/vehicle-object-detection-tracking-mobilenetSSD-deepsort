@@ -11,7 +11,7 @@ from PIL import ImageFont
 MAX_OBJECTS = 10
 
 # Labels of interest
-LABEL_SELECTOR = set([b'Person'])
+LABEL_SELECTOR = set([b'Car'])
 
 def draw_bounding_box_on_image(image, ymin, xmin, ymax, xmax, color,
                                font, thickness=4, display_str_list=()):
@@ -81,7 +81,7 @@ def get_boxes(image, boxes, class_names, scores, selected_indices, min_score=0.2
       ymin, xmin, ymax, xmax = tuple(boxes[i])
       im_height, im_width, channel = image.shape
       left, right, top, bottom = (xmin * im_width, xmax * im_width,
-                                    ymin * im_height, ymax * im_height)
+                                    ymin * im_height, draw_bounding_box_on_image * im_height)
       box_lst.append((int(left), int(top), int(right - left), int(bottom - top)))
       #box_lst.append((int(left), int(right), int(top), int(bottom)))
       box_count += 1
