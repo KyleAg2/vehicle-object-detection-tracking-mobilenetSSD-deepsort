@@ -4,7 +4,7 @@ from deep_sort.person_id_model.generate_person_features import generate_detectio
 from deep_sort.deep_sort_app import run_deep_sort, DeepSORTConfig
 from deep_sort.application_util.visualization import cv2
 
-cap = cv2.VideoCapture(cv2.samples.findFile(sys.argv[1]))
+cap = cv2.VideoCapture(0)
 
 model = ObjectRecognition()
 encoder = init_encoder()

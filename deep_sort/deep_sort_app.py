@@ -32,7 +32,7 @@ def gather_sequence_info(detections, image):
 def create_detections(detection_mat, min_height=0, frame_idx=1):
     """Create detections for given frame index from the raw detection matrix.
     """
-    frame_indices = detection_mat[:, 0].astype(np.int)
+    frame_indices = detection_mat[:, 0].astype(int)
     mask = frame_indices == frame_idx
 
     detection_list = []

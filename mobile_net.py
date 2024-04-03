@@ -7,11 +7,24 @@ from PIL import ImageColor
 from PIL import ImageDraw
 from PIL import ImageFont
 
+import cv2
+
 # Maximum objects to be classified in the image
 MAX_OBJECTS = 10
 
 # Labels of interest
 LABEL_SELECTOR = set([b'Car'])
+
+#Region of interest
+area=[(712,440),(887,480),(494,580),(347,551),(328,497)]
+
+def draw_region_of_interest(image):
+  cv2.polylines(image,[np.array(area,np.int32)],True,(0,0,255)) #red
+
+def detect_objects_in_ROI(point_x_of_interest, point_y_of_interest):
+  vehicle_state = cv2.pointPolygonTest(np.array(area,np.int32),((point_x_of_interest,point_y_of_interest)),False) #Detect of the point is in the region of interest 
+  if vehicle_state>=0: return 0 #if inside, then return 0
+  else: return 1  #if outside then return 1
 
 def draw_bounding_box_on_image(image, ymin, xmin, ymax, xmax, color,
                                font, thickness=4, display_str_list=()):
@@ -20,6 +33,19 @@ def draw_bounding_box_on_image(image, ymin, xmin, ymax, xmax, color,
   im_width, im_height = image.size
   (left, right, top, bottom) = (xmin * im_width, xmax * im_width,
                                 ymin * im_height, ymax * im_height)
+  
+  #============Calculate the Position in Bounding Box to Detect==========
+  cx=int(left+right)//2
+  cy=int(bottom)
+  #============================Draw the Boxes============================
+  center = (cx, cy)
+  radius = 5
+  fill_color = (255, 0, 0)
+  draw.ellipse([(center[0] - radius, center[1] - radius), (center[0] + radius, center[1] + radius)], fill=fill_color)
+  
+  if(detect_objects_in_ROI(cx, cy)):
+     return 0 #Then DONT DO ANYTHING (DRAW) BUT CONTINUE THE LOOP
+
   draw.line([(left, top), (left, bottom), (right, bottom), (right, top),
              (left, top)],
             width=thickness,
@@ -48,8 +74,11 @@ def draw_bounding_box_on_image(image, ymin, xmin, ymax, xmax, color,
     text_bottom -= text_height - 2 * margin
 
 
+
 def draw_boxes(image, boxes, class_names, scores, selected_indices, max_boxes=MAX_OBJECTS, min_score=0.3):
+
   """Overlay labeled boxes on an image with formatted scores and label names."""
+  draw_region_of_interest(image)
   colors = list(ImageColor.colormap.values())
   font = ImageFont.load_default()
   box_count = 0
@@ -60,10 +89,12 @@ def draw_boxes(image, boxes, class_names, scores, selected_indices, max_boxes=MA
         continue
     if scores[i] >= min_score and class_names[i] in LABEL_SELECTOR:
       ymin, xmin, ymax, xmax = tuple(boxes[i])
+      #if detect_objects_in_ROI(ymin, xmin, ymax, xmax) == 1:
+         #continue
       display_str = "{}: {}%".format(class_names[i].decode("ascii"), int(100 * scores[i]))
       color = colors[hash(class_names[i]) % len(colors)]
       image_pil = Image.fromarray(np.uint8(image)).convert("RGB")
-      draw_bounding_box_on_image( image_pil, ymin, xmin, ymax, xmax, color, font, display_str_list=[display_str])
+      draw_bounding_box_on_image(image_pil, ymin, xmin, ymax, xmax, color, font, display_str_list=[display_str])
       np.copyto(image, np.array(image_pil))
       box_count += 1
   return image, box_count
@@ -81,7 +112,7 @@ def get_boxes(image, boxes, class_names, scores, selected_indices, min_score=0.2
       ymin, xmin, ymax, xmax = tuple(boxes[i])
       im_height, im_width, channel = image.shape
       left, right, top, bottom = (xmin * im_width, xmax * im_width,
-                                    ymin * im_height, draw_bounding_box_on_image * im_height)
+                            ymin * im_height, ymax * im_height)
       box_lst.append((int(left), int(top), int(right - left), int(bottom - top)))
       #box_lst.append((int(left), int(right), int(top), int(bottom)))
       box_count += 1
@@ -119,3 +150,4 @@ class ObjectRecognition:
             frame, result["detection_boxes"],
             result["detection_class_entities"], result["detection_scores"], selected_indices)
         return boxes
+
