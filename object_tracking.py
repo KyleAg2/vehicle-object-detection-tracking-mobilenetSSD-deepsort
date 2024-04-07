@@ -13,7 +13,7 @@ config = DeepSORTConfig()
 while(True):
     ret, frame = cap.read()
     boxes = model.get_boxes(frame)
-
+    #print(boxes)
     if len(boxes) > 0:
         encoding = generate_detections(encoder, boxes, frame)
         run_deep_sort(frame, encoding, config)

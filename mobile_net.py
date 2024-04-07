@@ -44,7 +44,7 @@ def draw_bounding_box_on_image(image, ymin, xmin, ymax, xmax, color,
   draw.ellipse([(center[0] - radius, center[1] - radius), (center[0] + radius, center[1] + radius)], fill=fill_color)
   
   if(detect_objects_in_ROI(cx, cy)):
-     return 0 #Then DONT DO ANYTHING (DRAW) BUT CONTINUE THE LOOP
+     return 0 #Then DONT DO ANYTHING (DRAW) BUT CONTINUE THE LOOP found in the draw_boxes method
 
   draw.line([(left, top), (left, bottom), (right, bottom), (right, top),
              (left, top)],
@@ -78,7 +78,8 @@ def draw_bounding_box_on_image(image, ymin, xmin, ymax, xmax, color,
 def draw_boxes(image, boxes, class_names, scores, selected_indices, max_boxes=MAX_OBJECTS, min_score=0.3):
 
   """Overlay labeled boxes on an image with formatted scores and label names."""
-  draw_region_of_interest(image)
+  draw_region_of_interest(image) #Custom Code
+
   colors = list(ImageColor.colormap.values())
   font = ImageFont.load_default()
   box_count = 0
@@ -89,8 +90,6 @@ def draw_boxes(image, boxes, class_names, scores, selected_indices, max_boxes=MA
         continue
     if scores[i] >= min_score and class_names[i] in LABEL_SELECTOR:
       ymin, xmin, ymax, xmax = tuple(boxes[i])
-      #if detect_objects_in_ROI(ymin, xmin, ymax, xmax) == 1:
-         #continue
       display_str = "{}: {}%".format(class_names[i].decode("ascii"), int(100 * scores[i]))
       color = colors[hash(class_names[i]) % len(colors)]
       image_pil = Image.fromarray(np.uint8(image)).convert("RGB")
@@ -124,7 +123,6 @@ def non_max_suppression(boxes, scores):
     #selected_boxes = tf.gather(boxes, selected_indices)
     return selected_indices.numpy()
 
-
 class ObjectRecognition:
     def __init__(self):
         module_handle = "https://tfhub.dev/google/openimages_v4/ssd/mobilenet_v2/1"
@@ -146,8 +144,10 @@ class ObjectRecognition:
         result = self.model(converted_img)
         selected_indices = non_max_suppression(result['detection_boxes'], result['detection_scores'])
         result = {key: value.numpy() for key, value in result.items()}
+        draw_region_of_interest(frame)
         boxes = get_boxes(
             frame, result["detection_boxes"],
             result["detection_class_entities"], result["detection_scores"], selected_indices)
+        #boxes = detect_objects_in_ROI_for_deepsort(boxes)
         return boxes
 
