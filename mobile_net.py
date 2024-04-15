@@ -16,18 +16,24 @@ MAX_OBJECTS = 10
 LABEL_SELECTOR = set([b'Car'])
 
 #Region of interest Test
-area=[(712,440),(887,480),(494,580),(347,551),(328,497)]
+#area=[(712,440),(887,480),(494,580),(347,551),(328,497)]
 
-def draw_region_of_interest(image, roi_points=area):
-  cv2.polylines(image,[np.array(roi_points,np.int32)],True,(0,0,255)) #red
+def draw_region_of_interest(image, roi_points):
+  if roi_points is not None: #If there is ROI, then draw, if not, skip
+    cv2.polylines(image,[np.array(roi_points,np.int32)],True,(0,0,255)) #red
 
-def detect_objects_in_ROI(point_x_of_interest, point_y_of_interest, roi_points=area):
+def detect_objects_in_ROI(point_x_of_interest, point_y_of_interest, roi_points):
   vehicle_state = cv2.pointPolygonTest(np.array(roi_points,np.int32),((point_x_of_interest,point_y_of_interest)),False) #Detect of the point is in the region of interest 
-  if vehicle_state>=0: return 0 #if inside, then return 0
-  else: return 1  #if outside then return 1
+  if vehicle_state>=0: return 0 #if inside, then return 0, draw
+  else: return 1  #if outside then return 1, skip
+
+def centroid_calculation(left, right, top, bottom):
+  cx=int(left+right)//2
+  cy=int(bottom)
+  return cx, cy
 
 def draw_bounding_box_on_image(image, ymin, xmin, ymax, xmax, color,
-                               font, thickness=4, display_str_list=()):
+                               font, roi_points, thickness=4, display_str_list=()):
   """Adds a bounding box to an image."""
   draw = ImageDraw.Draw(image)
   im_width, im_height = image.size
@@ -35,16 +41,17 @@ def draw_bounding_box_on_image(image, ymin, xmin, ymax, xmax, color,
                                 ymin * im_height, ymax * im_height)
   
   #============Calculate the Position in Bounding Box to Detect==========
-  cx=int(left+right)//2
-  cy=int(bottom)
+  cx, cy = centroid_calculation(left, right, top, bottom)
   #============================Draw the Boxes============================
-  point_of_interest = (cx, cy)
   radius = 5
   fill_color = (255, 0, 0)
-  draw.ellipse([(point_of_interest[0] - radius, point_of_interest[1] - radius), (point_of_interest[0] + radius, point_of_interest[1] + radius)], fill=fill_color)
+  draw.ellipse([(cx - radius, cy - radius), (cx + radius, cy + radius)], fill=fill_color)
   
-  if(detect_objects_in_ROI(cx, cy)):
-     return 0 #Then DONT DO ANYTHING (DRAW) BUT CONTINUE THE LOOP found in the draw_boxes method
+  if roi_points is not None:
+    if len(roi_points) >= 3:  
+      if(detect_objects_in_ROI(cx, cy, roi_points)):
+        return 0 #Then DONT DO ANYTHING (DRAW) BUT CONTINUE THE LOOP found in the draw_boxes method
+    else: return 0
 
   draw.line([(left, top), (left, bottom), (right, bottom), (right, top),
              (left, top)],
@@ -75,10 +82,9 @@ def draw_bounding_box_on_image(image, ymin, xmin, ymax, xmax, color,
 
 
 
-def draw_boxes(image, boxes, class_names, scores, selected_indices, max_boxes=MAX_OBJECTS, min_score=0.3):
+def draw_boxes(image, boxes, class_names, scores, selected_indices, roi_points, max_boxes=MAX_OBJECTS, min_score=0.3):
 
   """Overlay labeled boxes on an image with formatted scores and label names."""
-  draw_region_of_interest(image) #Custom Code
 
   colors = list(ImageColor.colormap.values())
   font = ImageFont.load_default()
@@ -93,12 +99,12 @@ def draw_boxes(image, boxes, class_names, scores, selected_indices, max_boxes=MA
       display_str = "{}: {}%".format(class_names[i].decode("ascii"), int(100 * scores[i]))
       color = colors[hash(class_names[i]) % len(colors)]
       image_pil = Image.fromarray(np.uint8(image)).convert("RGB")
-      draw_bounding_box_on_image(image_pil, ymin, xmin, ymax, xmax, color, font, display_str_list=[display_str])
+      draw_bounding_box_on_image(image_pil, ymin, xmin, ymax, xmax, color, font, roi_points, display_str_list=[display_str])
       np.copyto(image, np.array(image_pil))
       box_count += 1
   return image, box_count
 
-def get_boxes(image, boxes, class_names, scores, selected_indices, roi_points=None, min_score=0.2):
+def get_boxes(image, boxes, class_names, scores, selected_indices, roi_points, min_score=0.2):
   """Overlay labeled boxes on an image with formatted scores and label names."""
   box_count = 0
   box_lst = []
@@ -115,8 +121,7 @@ def get_boxes(image, boxes, class_names, scores, selected_indices, roi_points=No
       if roi_points is not None:
           if len(roi_points) >= 3:
             #============Calculate the Position in Bounding Box to Detect==========
-            cx=int(left+right)//2
-            cy=int(bottom)
+            cx, cy = centroid_calculation(left, right, top, bottom)
             #============================Draw the Boxes============================
             point_of_interest = (cx, cy)
             cv2.circle(image, point_of_interest, 5, (255, 0, 0), -1)
@@ -140,15 +145,18 @@ class ObjectRecognition:
         module_handle = "https://tfhub.dev/google/openimages_v4/ssd/mobilenet_v2/1"
         self.model = hub.load(module_handle).signatures['default']
 
-    def run_object_recognition(self, frame): #Not added any dynamic ROI yet
+    def run_object_recognition(self, frame, roi_points):
         converted_img = tf.image.convert_image_dtype(frame, tf.float32)[tf.newaxis, ...]
         result = self.model(converted_img)
         selected_indices = non_max_suppression(result['detection_boxes'], result['detection_scores'])
         result = {key: value.numpy() for key, value in result.items()}
 
+        draw_region_of_interest(frame, roi_points) #Custom Code
+
         image_with_boxes, box_count = draw_boxes(
             frame, result["detection_boxes"],
-            result["detection_class_entities"], result["detection_scores"], selected_indices)
+            result["detection_class_entities"], result["detection_scores"], selected_indices, roi_points)
+  
         return image_with_boxes, box_count
 
     def get_boxes(self, frame, roi_points=None):
