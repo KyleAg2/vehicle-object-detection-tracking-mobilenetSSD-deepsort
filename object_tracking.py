@@ -4,10 +4,28 @@ from deep_sort.person_id_model.generate_person_features import generate_detectio
 from deep_sort.deep_sort_app import run_deep_sort, DeepSORTConfig
 from deep_sort.application_util.visualization import cv2
 
-cap = cv2.VideoCapture(0)
+import numpy as np
+
+cap = cv2.VideoCapture("30 Minutes of Cars Driving By in 2009.mp4")
+
+roi_points = []
+points = 0
+
+def printCoordinate(event, x ,y, flags, params):
+    global points, roi_points
+
+    if event==cv2.EVENT_LBUTTONDOWN:
+        if points < 4:
+            roi_points.append((x, y))
+            points = points + 1
+            print("Points: " + str(points))
+        else:
+            points = 0
+            roi_points = []
+            print("Points Reset")
 
 model = ObjectRecognition()
-encoder = init_encoder()
+encoder = init_encoder() 
 config = DeepSORTConfig()
 
 while(True):
@@ -17,9 +35,11 @@ while(True):
     if len(boxes) > 0:
         encoding = generate_detections(encoder, boxes, frame)
         run_deep_sort(frame, encoding, config)
-
+    else:
+        # Display the frame without deepsort
+        cv2.imshow('frame', frame) 
+        cv2.setMouseCallback('frame', printCoordinate)    
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
-
 cap.release()
 cv2.destroyAllWindows()

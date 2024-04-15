@@ -45,6 +45,9 @@ Simple Online and Realtime Tracking with a Deep Association Metric [arxiv link](
 <a id="1">[3]</a> https://github.com/nwojke/deep_sort
 
 ## Requirement
-- Python3
-- TensorFlow >= 2.1
+- Python3 >= 2.12.0
+- TensorFlow >= 2.16
 - OpenCV
+- Pillow == 9.5.0
+- Scipy
+- Tensorflow hub

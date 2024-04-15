@@ -15,14 +15,14 @@ MAX_OBJECTS = 10
 # Labels of interest
 LABEL_SELECTOR = set([b'Car'])
 
-#Region of interest
+#Region of interest Test
 area=[(712,440),(887,480),(494,580),(347,551),(328,497)]
 
-def draw_region_of_interest(image):
-  cv2.polylines(image,[np.array(area,np.int32)],True,(0,0,255)) #red
+def draw_region_of_interest(image, roi_points=area):
+  cv2.polylines(image,[np.array(roi_points,np.int32)],True,(0,0,255)) #red
 
-def detect_objects_in_ROI(point_x_of_interest, point_y_of_interest):
-  vehicle_state = cv2.pointPolygonTest(np.array(area,np.int32),((point_x_of_interest,point_y_of_interest)),False) #Detect of the point is in the region of interest 
+def detect_objects_in_ROI(point_x_of_interest, point_y_of_interest, roi_points=area):
+  vehicle_state = cv2.pointPolygonTest(np.array(roi_points,np.int32),((point_x_of_interest,point_y_of_interest)),False) #Detect of the point is in the region of interest 
   if vehicle_state>=0: return 0 #if inside, then return 0
   else: return 1  #if outside then return 1
 
@@ -38,10 +38,10 @@ def draw_bounding_box_on_image(image, ymin, xmin, ymax, xmax, color,
   cx=int(left+right)//2
   cy=int(bottom)
   #============================Draw the Boxes============================
-  center = (cx, cy)
+  point_of_interest = (cx, cy)
   radius = 5
   fill_color = (255, 0, 0)
-  draw.ellipse([(center[0] - radius, center[1] - radius), (center[0] + radius, center[1] + radius)], fill=fill_color)
+  draw.ellipse([(point_of_interest[0] - radius, point_of_interest[1] - radius), (point_of_interest[0] + radius, point_of_interest[1] + radius)], fill=fill_color)
   
   if(detect_objects_in_ROI(cx, cy)):
      return 0 #Then DONT DO ANYTHING (DRAW) BUT CONTINUE THE LOOP found in the draw_boxes method
@@ -98,7 +98,7 @@ def draw_boxes(image, boxes, class_names, scores, selected_indices, max_boxes=MA
       box_count += 1
   return image, box_count
 
-def get_boxes(image, boxes, class_names, scores, selected_indices, min_score=0.2):
+def get_boxes(image, boxes, class_names, scores, selected_indices, roi_points=None, min_score=0.2):
   """Overlay labeled boxes on an image with formatted scores and label names."""
   box_count = 0
   box_lst = []
@@ -111,10 +111,22 @@ def get_boxes(image, boxes, class_names, scores, selected_indices, min_score=0.2
       ymin, xmin, ymax, xmax = tuple(boxes[i])
       im_height, im_width, channel = image.shape
       left, right, top, bottom = (xmin * im_width, xmax * im_width,
-                            ymin * im_height, ymax * im_height)
-      box_lst.append((int(left), int(top), int(right - left), int(bottom - top)))
-      #box_lst.append((int(left), int(right), int(top), int(bottom)))
-      box_count += 1
+                            ymin * im_height, ymax * im_height) 
+      if roi_points is not None:
+          if len(roi_points) >= 3:
+            #============Calculate the Position in Bounding Box to Detect==========
+            cx=int(left+right)//2
+            cy=int(bottom)
+            #============================Draw the Boxes============================
+            point_of_interest = (cx, cy)
+            cv2.circle(image, point_of_interest, 5, (255, 0, 0), -1)
+            # Check if the box is within the ROI
+            if not detect_objects_in_ROI(cx, cy, roi_points):
+              box_lst.append((int(left), int(top), int(right - left), int(bottom - top)))
+              box_count += 1                 
+      else:
+        box_lst.append((int(left), int(top), int(right - left), int(bottom - top)))
+        box_count += 1     
   return np.array(box_lst)
 
 def non_max_suppression(boxes, scores):
@@ -128,7 +140,7 @@ class ObjectRecognition:
         module_handle = "https://tfhub.dev/google/openimages_v4/ssd/mobilenet_v2/1"
         self.model = hub.load(module_handle).signatures['default']
 
-    def run_object_recognition(self, frame):
+    def run_object_recognition(self, frame): #Not added any dynamic ROI yet
         converted_img = tf.image.convert_image_dtype(frame, tf.float32)[tf.newaxis, ...]
         result = self.model(converted_img)
         selected_indices = non_max_suppression(result['detection_boxes'], result['detection_scores'])
@@ -139,15 +151,16 @@ class ObjectRecognition:
             result["detection_class_entities"], result["detection_scores"], selected_indices)
         return image_with_boxes, box_count
 
-    def get_boxes(self, frame):
+    def get_boxes(self, frame, roi_points=None):
         converted_img = tf.image.convert_image_dtype(frame, tf.float32)[tf.newaxis, ...]
         result = self.model(converted_img)
         selected_indices = non_max_suppression(result['detection_boxes'], result['detection_scores'])
         result = {key: value.numpy() for key, value in result.items()}
-        draw_region_of_interest(frame)
+
+        draw_region_of_interest(frame, roi_points) #draw the region of interest *added
+
         boxes = get_boxes(
             frame, result["detection_boxes"],
-            result["detection_class_entities"], result["detection_scores"], selected_indices)
-        #boxes = detect_objects_in_ROI_for_deepsort(boxes)
+            result["detection_class_entities"], result["detection_scores"], selected_indices, roi_points)
         return boxes
 
