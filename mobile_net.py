@@ -108,6 +108,8 @@ def get_boxes(image, boxes, class_names, scores, selected_indices, roi_points, m
   """Overlay labeled boxes on an image with formatted scores and label names."""
   box_count = 0
   box_lst = []
+  centroid_list = []
+
   for i in range(boxes.shape[0]):
     if box_count >= MAX_OBJECTS:
         break
@@ -128,11 +130,12 @@ def get_boxes(image, boxes, class_names, scores, selected_indices, roi_points, m
             # Check if the box is within the ROI
             if not detect_objects_in_ROI(cx, cy, roi_points):
               box_lst.append((int(left), int(top), int(right - left), int(bottom - top)))
+              centroid_list.append(point_of_interest)
               box_count += 1                 
       else:
         box_lst.append((int(left), int(top), int(right - left), int(bottom - top)))
         box_count += 1     
-  return np.array(box_lst)
+  return np.array(box_lst), centroid_list
 
 def non_max_suppression(boxes, scores):
     selected_indices = tf.image.non_max_suppression(boxes, scores, 1000, iou_threshold=0.5,
@@ -150,7 +153,7 @@ class ObjectRecognition:
         result = self.model(converted_img)
         selected_indices = non_max_suppression(result['detection_boxes'], result['detection_scores'])
         result = {key: value.numpy() for key, value in result.items()}
-
+        
         draw_region_of_interest(frame, roi_points) #Custom Code
 
         image_with_boxes, box_count = draw_boxes(
@@ -167,8 +170,8 @@ class ObjectRecognition:
 
         draw_region_of_interest(frame, roi_points) #draw the region of interest *added
 
-        boxes = get_boxes(
+        boxes, centroid_list = get_boxes(
             frame, result["detection_boxes"],
             result["detection_class_entities"], result["detection_scores"], selected_indices, roi_points)
-        return boxes
+        return boxes, centroid_list
 

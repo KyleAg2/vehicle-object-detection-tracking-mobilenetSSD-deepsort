@@ -3,9 +3,10 @@ import cv2
 import numpy as np
 from mobile_net import *
 
-cap = cv2.VideoCapture("30 Minutes of Cars Driving By in 2009.mp4")
+cap = cv2.VideoCapture("Street Sounds 2  _Road Nosie_.mp4")
 
 model = ObjectRecognition()
+
 """
 def printCoordinate(event, x ,y, flags, params):
     if event==cv2.EVENT_LBUTTONDOWN:
@@ -36,7 +37,7 @@ def printCoordinate(event, x ,y, flags, params):
 while(True):
     # Capture frame-by-frame
     ret, frame = cap.read()
-    frame_with_boxes, box_count = model.run_object_recognition(frame, None)
+    frame_with_boxes, box_count = model.run_object_recognition(frame, roi_points)
     cv2.putText(frame_with_boxes, 'Cars: '+ str(box_count), (15, 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5 , (0,0,0))
     cv2.imshow('frame', frame_with_boxes)
 

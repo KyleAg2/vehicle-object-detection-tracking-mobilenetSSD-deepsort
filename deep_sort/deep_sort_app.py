@@ -16,7 +16,7 @@ def gather_sequence_info(detections, image):
     min_frame_idx = 1
     max_frame_idx = 1
     update_ms = 5
-    feature_dim = detections.shape[1] - 10 if detections is not None else 0
+    feature_dim = detections.shape[1] - 10 if detections is not None else 0 #so that only feature vectors (for calcualtion) are left
     seq_info = {
         "sequence_name": "NA",
         "image_filenames": "NA",
@@ -54,9 +54,9 @@ def run(image, detection, config, min_confidence,
     # Run tracker.
     # Load image and generate detections.
     detections = create_detections(
-        seq_info["detections"], min_detection_height)
+        seq_info["detections"], min_detection_height) #has both the image and detections | matting / cropping
     detections = [d for d in detections if d.confidence >= min_confidence]
-
+    
     # Run non-maxima suppression.
     boxes = np.array([d.tlwh for d in detections])
     scores = np.array([d.confidence for d in detections])
@@ -69,6 +69,7 @@ def run(image, detection, config, min_confidence,
     tracker.predict()
     tracker.update(detections)
 
+    object_timer(tracker.tracks)
     draw_trackers(tracker.tracks, img_cpy)
 
 def run_deep_sort(image, detection, config):
@@ -77,8 +78,14 @@ def run_deep_sort(image, detection, config):
     min_detection_height = 0.0
     run(image, detection, config, min_confidence, nms_max_overlap, min_detection_height)
 
+def object_timer(tracker):
+    for track in tracker:
+        if not track.is_confirmed() or track.time_since_update > 0:
+            continue
+        print(track.track_id)
+        
 class DeepSORTConfig:
     def __init__(self, max_cosine_distance=0.2, nn_budget = 100):
         metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
-        self.tracker = Tracker(metric)
+        self.tracker = Tracker(metric)  #This is the tracker variable | Very Important
         self.results = []

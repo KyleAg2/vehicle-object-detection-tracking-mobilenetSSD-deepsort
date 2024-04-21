@@ -30,15 +30,17 @@ config = DeepSORTConfig()
 
 while(True):
     ret, frame = cap.read()
-    boxes = model.get_boxes(frame, roi_points)
-    #print(boxes)
+    boxes, centroid_list = model.get_boxes(frame, roi_points)
+    
     if len(boxes) > 0:
         encoding = generate_detections(encoder, boxes, frame)
         run_deep_sort(frame, encoding, config)
+        #config.time_object()
     else:
         # Display the frame without deepsort
         cv2.imshow('frame', frame) 
-        cv2.setMouseCallback('frame', printCoordinate)    
+ 
+    cv2.setMouseCallback('frame', printCoordinate)    
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 cap.release()
