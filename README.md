@@ -44,6 +44,12 @@ Simple Online and Realtime Tracking with a Deep Association Metric [arxiv link](
 
 <a id="1">[3]</a> https://github.com/nwojke/deep_sort
 
+<a id="1">[4]</a> OpenCV Python Tutorial 6 - Handling mouse events using cv2.setMouseCallback(): https://www.youtube.com/watch?v=b1J7w5Cb0V0&t=2s
+
+<a id="1">[5]</a> advance level yolo object detection | object detection with yolo | opencv python tutorial | yolov5: https://www.youtube.com/watch?v=haC7eG-u2yQ 
+
+<a id="1">[6]</a> Python Tutorial | How to calculate time difference in hours, minutes, and seconds: https://www.youtube.com/watch?v=haC7eG-u2yQ
+
 ## Requirement
 - Python3 >= 2.12.0
 - TensorFlow >= 2.16

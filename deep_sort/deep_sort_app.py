@@ -1,6 +1,8 @@
 from __future__ import division, print_function, absolute_import
 import numpy as np
 
+from datetime import datetime
+
 from deep_sort.application_util import preprocessing
 from deep_sort.application_util.visualization import draw_trackers
 from deep_sort.deep_sort import nn_matching
@@ -69,7 +71,7 @@ def run(image, detection, config, min_confidence,
     tracker.predict()
     tracker.update(detections)
 
-    object_timer(tracker.tracks)
+    object_timer(tracker.tracks, config)
     draw_trackers(tracker.tracks, img_cpy)
 
 def run_deep_sort(image, detection, config):
@@ -78,14 +80,26 @@ def run_deep_sort(image, detection, config):
     min_detection_height = 0.0
     run(image, detection, config, min_confidence, nms_max_overlap, min_detection_height)
 
-def object_timer(tracker):
-    for track in tracker:
+def object_timer(tracks, config):
+    current_time = datetime.now()
+    for track in tracks:
+        track_id = track.track_id
         if not track.is_confirmed() or track.time_since_update > 0:
             continue
-        print(track.track_id)
-        
+        if track_id not in config.track_start_time:
+            config.track_start_time[track_id] = current_time
+        else:
+            elapsed_time = current_time - config.track_start_time[track_id]
+            if elapsed_time.total_seconds() >= 4:
+                print("Illegally Parked:", track_id)
+                # Reset the start time for the track
+                del config.track_start_time[track_id]
+
+    #print(config.track_start_time)
+       
 class DeepSORTConfig:
     def __init__(self, max_cosine_distance=0.2, nn_budget = 100):
         metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
         self.tracker = Tracker(metric)  #This is the tracker variable | Very Important
         self.results = []
+        self.track_start_time = {}
