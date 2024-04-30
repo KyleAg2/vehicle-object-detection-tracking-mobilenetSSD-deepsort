@@ -9,6 +9,8 @@ from deep_sort.deep_sort import nn_matching
 from deep_sort.deep_sort.detection import Detection
 from deep_sort.deep_sort.tracker import Tracker
 
+from roi import *
+
 def gather_sequence_info(detections, image):
     """Gather sequence information, such as image filenames, detections,
     groundtruth (if available).
@@ -71,7 +73,7 @@ def run(image, detection, config, min_confidence,
     tracker.predict()
     tracker.update(detections)
 
-    object_timer(tracker.tracks, config)
+    object_timer(tracker.tracks, config, img_cpy)
     draw_trackers(tracker.tracks, img_cpy)
 
 def run_deep_sort(image, detection, config):
@@ -80,23 +82,34 @@ def run_deep_sort(image, detection, config):
     min_detection_height = 0.0
     run(image, detection, config, min_confidence, nms_max_overlap, min_detection_height)
 
-def object_timer(tracks, config):
+def object_timer(tracks, config, image):
     current_time = datetime.now()
     for track in tracks:
         track_id = track.track_id
+        # Get bounding box coordinates
+        x, y, w, h = track.to_tlwh() #x and w are paired while y and h are paired. x and y 
+                                     #are the top left of the bounding box
+                                     #in a nutshell, x is left, x + w is right; y is top, y + h is bottom
+        # Calculate centroid coordinates
+        centroid_x, centroid_y = centroid_calculation(x, x + w, y, y + h)
+
         if not track.is_confirmed() or track.time_since_update > 0:
             continue
+
+        #Print the centroid coordinates
+        #print("Centroid Coordinates (x, y) Tracking:", centroid_x, centroid_y)
+        draw_centroid_object_tracking(centroid_x, centroid_y, image)
+
         if track_id not in config.track_start_time:
             config.track_start_time[track_id] = current_time
         else:
             elapsed_time = current_time - config.track_start_time[track_id]
             if elapsed_time.total_seconds() >= 4:
-                print("Illegally Parked:", track_id)
+                #print("Illegally Parked:", track_id)
                 # Reset the start time for the track
                 del config.track_start_time[track_id]
+                #print(config.track_start_time)
 
-    #print(config.track_start_time)
-       
 class DeepSORTConfig:
     def __init__(self, max_cosine_distance=0.2, nn_budget = 100):
         metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)

@@ -9,6 +9,8 @@ from PIL import ImageFont
 
 import cv2
 
+from roi import *
+
 # Maximum objects to be classified in the image
 MAX_OBJECTS = 10
 
@@ -17,20 +19,6 @@ LABEL_SELECTOR = set([b'Car'])
 
 #Region of interest Test
 #area=[(712,440),(887,480),(494,580),(347,551),(328,497)]
-
-def draw_region_of_interest(image, roi_points):
-  if roi_points is not None: #If there is ROI, then draw, if not, skip
-    cv2.polylines(image,[np.array(roi_points,np.int32)],True,(0,0,255)) #red
-
-def detect_objects_in_ROI(point_x_of_interest, point_y_of_interest, roi_points):
-  vehicle_state = cv2.pointPolygonTest(np.array(roi_points,np.int32),((point_x_of_interest,point_y_of_interest)),False) #Detect of the point is in the region of interest 
-  if vehicle_state>=0: return 0 #if inside, then return 0, draw
-  else: return 1  #if outside then return 1, skip
-
-def centroid_calculation(left, right, top, bottom):
-  cx=int(left+right)//2
-  cy=int(bottom)
-  return cx, cy
 
 def draw_bounding_box_on_image(image, ymin, xmin, ymax, xmax, color,
                                font, roi_points, thickness=4, display_str_list=()):
@@ -42,16 +30,17 @@ def draw_bounding_box_on_image(image, ymin, xmin, ymax, xmax, color,
   
   #============Calculate the Position in Bounding Box to Detect==========
   cx, cy = centroid_calculation(left, right, top, bottom)
+  
+  if roi_points is not None:
+    if len(roi_points) >= 3:  
+      if not detect_objects_in_ROI(cx, cy, roi_points):
+        return #Then DONT DO ANYTHING (DRAW) BUT CONTINUE THE LOOP found in the draw_boxes method
+    else: return 
+
   #============================Draw the Boxes============================
   radius = 5
   fill_color = (255, 0, 0)
   draw.ellipse([(cx - radius, cy - radius), (cx + radius, cy + radius)], fill=fill_color)
-  
-  if roi_points is not None:
-    if len(roi_points) >= 3:  
-      if(detect_objects_in_ROI(cx, cy, roi_points)):
-        return 0 #Then DONT DO ANYTHING (DRAW) BUT CONTINUE THE LOOP found in the draw_boxes method
-    else: return 0
 
   draw.line([(left, top), (left, bottom), (right, bottom), (right, top),
              (left, top)],
@@ -108,7 +97,6 @@ def get_boxes(image, boxes, class_names, scores, selected_indices, roi_points, m
   """Overlay labeled boxes on an image with formatted scores and label names."""
   box_count = 0
   box_lst = []
-  centroid_list = []
 
   for i in range(boxes.shape[0]):
     if box_count >= MAX_OBJECTS:
@@ -124,18 +112,15 @@ def get_boxes(image, boxes, class_names, scores, selected_indices, roi_points, m
           if len(roi_points) >= 3:
             #============Calculate the Position in Bounding Box to Detect==========
             cx, cy = centroid_calculation(left, right, top, bottom)
-            #============================Draw the Boxes============================
-            point_of_interest = (cx, cy)
-            cv2.circle(image, point_of_interest, 5, (255, 0, 0), -1)
-            # Check if the box is within the ROI
-            if not detect_objects_in_ROI(cx, cy, roi_points):
+            #print("Centroid Coordinates (x, y) Mobilenet:", cx, cy)
+            # Check if the box is within the ROI 
+            if detect_objects_in_ROI(cx, cy, roi_points):
               box_lst.append((int(left), int(top), int(right - left), int(bottom - top)))
-              centroid_list.append(point_of_interest)
-              box_count += 1                 
+              box_count += 1                      
       else:
         box_lst.append((int(left), int(top), int(right - left), int(bottom - top)))
         box_count += 1     
-  return np.array(box_lst), centroid_list
+  return np.array(box_lst)
 
 def non_max_suppression(boxes, scores):
     selected_indices = tf.image.non_max_suppression(boxes, scores, 1000, iou_threshold=0.5,
@@ -170,8 +155,8 @@ class ObjectRecognition:
 
         draw_region_of_interest(frame, roi_points) #draw the region of interest *added
 
-        boxes, centroid_list = get_boxes(
+        boxes = get_boxes(
             frame, result["detection_boxes"],
             result["detection_class_entities"], result["detection_scores"], selected_indices, roi_points)
-        return boxes, centroid_list
+        return boxes
 

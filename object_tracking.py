@@ -30,7 +30,7 @@ config = DeepSORTConfig()
 
 while(True):
     ret, frame = cap.read()
-    boxes, centroid_list = model.get_boxes(frame, roi_points)
+    boxes = model.get_boxes(frame, roi_points)
     
     if len(boxes) > 0:
         encoding = generate_detections(encoder, boxes, frame)
