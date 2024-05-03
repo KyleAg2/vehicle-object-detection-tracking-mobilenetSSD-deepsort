@@ -1,26 +1,21 @@
 from __future__ import division, print_function, absolute_import
 import numpy as np
-
 from datetime import datetime
-
 from deep_sort.application_util import preprocessing
 from deep_sort.application_util.visualization import draw_trackers
 from deep_sort.deep_sort import nn_matching
 from deep_sort.deep_sort.detection import Detection
 from deep_sort.deep_sort.tracker import Tracker
 
-from roi import *
-
 def gather_sequence_info(detections, image):
     """Gather sequence information, such as image filenames, detections,
     groundtruth (if available).
     """
-
     image_size = image.shape[:2]
     min_frame_idx = 1
     max_frame_idx = 1
     update_ms = 5
-    feature_dim = detections.shape[1] - 10 if detections is not None else 0 #so that only feature vectors (for calcualtion) are left
+    feature_dim = detections.shape[1] - 10 if detections is not None else 0 #so that only feature vectors (for calculation) are left
     seq_info = {
         "sequence_name": "NA",
         "image_filenames": "NA",
@@ -73,7 +68,7 @@ def run(image, detection, config, min_confidence,
     tracker.predict()
     tracker.update(detections)
 
-    object_timer(tracker.tracks, config, img_cpy)
+    object_timer(tracker.tracks, config)
     draw_trackers(tracker.tracks, img_cpy)
 
 def run_deep_sort(image, detection, config):
@@ -82,37 +77,31 @@ def run_deep_sort(image, detection, config):
     min_detection_height = 0.0
     run(image, detection, config, min_confidence, nms_max_overlap, min_detection_height)
 
-def object_timer(tracks, config, image):
+def object_timer(tracks, config):
     current_time = datetime.now()
     for track in tracks:
         track_id = track.track_id
-        # Get bounding box coordinates
-        x, y, w, h = track.to_tlwh() #x and w are paired while y and h are paired. x and y 
-                                     #are the top left of the bounding box
-                                     #in a nutshell, x is left, x + w is right; y is top, y + h is bottom
-        # Calculate centroid coordinates
-        centroid_x, centroid_y = centroid_calculation(x, x + w, y, y + h)
-
         if not track.is_confirmed() or track.time_since_update > 0:
             continue
-
-        #Print the centroid coordinates
-        #print("Centroid Coordinates (x, y) Tracking:", centroid_x, centroid_y)
-        draw_centroid_object_tracking(centroid_x, centroid_y, image)
-
         if track_id not in config.track_start_time:
-            config.track_start_time[track_id] = current_time
+            config.track_start_time[track_id] = (current_time, track.to_tlwh()) # Store start time and initial position
         else:
-            elapsed_time = current_time - config.track_start_time[track_id]
-            if elapsed_time.total_seconds() >= 4:
-                #print("Illegally Parked:", track_id)
-                # Reset the start time for the track
-                del config.track_start_time[track_id]
-                #print(config.track_start_time)
+            start_time, initial_position = config.track_start_time[track_id]
+            elapsed_time = current_time - start_time
+            current_position = track.to_tlwh()
+            # Check if the object's position has remained relatively constant
+            if np.linalg.norm(np.array(initial_position[:2]) - np.array(current_position[:2])) < 10:  # You can adjust this threshold as needed
+                if elapsed_time.total_seconds() >= 4:  # Adjust this threshold as needed
+                    print("Illegal Parking Detected:", track_id)
+                    # Reset the start time for the track
+                    del config.track_start_time[track_id]
+            else:
+                # Object moved, reset start time and initial position
+                config.track_start_time[track_id] = (current_time, current_position)
 
 class DeepSORTConfig:
-    def __init__(self, max_cosine_distance=0.2, nn_budget = 100):
+    def __init__(self, max_cosine_distance=0.2, nn_budget=100):
         metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
-        self.tracker = Tracker(metric)  #This is the tracker variable | Very Important
+        self.tracker = Tracker(metric)  # This is the tracker variable | Very Important
         self.results = []
         self.track_start_time = {}

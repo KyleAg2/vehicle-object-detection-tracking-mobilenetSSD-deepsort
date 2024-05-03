@@ -110,11 +110,13 @@ def get_boxes(image, boxes, class_names, scores, selected_indices, roi_points, m
                             ymin * im_height, ymax * im_height) 
       if roi_points is not None:
           if len(roi_points) >= 3:
-            #============Calculate the Position in Bounding Box to Detect==========
+            #============Calculate the Position in Bounding Box to Detect============
             cx, cy = centroid_calculation(left, right, top, bottom)
             #print("Centroid Coordinates (x, y) Mobilenet:", cx, cy)
+
             # Check if the box is within the ROI 
             if detect_objects_in_ROI(cx, cy, roi_points):
+              draw_centroid_object_tracking(cx, cy, image)
               box_lst.append((int(left), int(top), int(right - left), int(bottom - top)))
               box_count += 1                      
       else:

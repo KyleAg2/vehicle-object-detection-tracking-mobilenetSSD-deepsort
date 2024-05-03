@@ -24,6 +24,11 @@ def printCoordinate(event, x ,y, flags, params):
             roi_points = []
             print("Points Reset")
 
+#create a blank frame so that we dont get an error on printCoordinate 
+    #because there is no frame at the start of the program
+ret, frame = cap.read()
+blank_frame = np.zeros_like(frame)
+
 model = ObjectRecognition()
 encoder = init_encoder() 
 config = DeepSORTConfig()
