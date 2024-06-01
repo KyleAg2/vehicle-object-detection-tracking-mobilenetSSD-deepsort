@@ -6,7 +6,7 @@ from deep_sort.application_util.visualization import cv2
 
 import numpy as np
 
-cap = cv2.VideoCapture("30 Minutes of Cars Driving By in 2009.mp4")
+cap = cv2.VideoCapture("Labrador_Luxe.mp4")
 
 roi_points = []
 points = 0
@@ -28,6 +28,8 @@ def printCoordinate(event, x ,y, flags, params):
     #because there is no frame at the start of the program
 ret, frame = cap.read()
 blank_frame = np.zeros_like(frame)
+
+cv2.imshow('frame', blank_frame) 
 
 model = ObjectRecognition()
 encoder = init_encoder() 
