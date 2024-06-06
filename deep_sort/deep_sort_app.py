@@ -1,21 +1,32 @@
 from __future__ import division, print_function, absolute_import
 import numpy as np
 from datetime import datetime
+import cv2
+import firebase_admin
+from firebase_admin import credentials, storage, firestore
 from deep_sort.application_util import preprocessing
 from deep_sort.application_util.visualization import draw_trackers
 from deep_sort.deep_sort import nn_matching
 from deep_sort.deep_sort.detection import Detection
 from deep_sort.deep_sort.tracker import Tracker
+import tempfile
+import os
+import uuid
+
+# Firebase setup
+cred = credentials.Certificate('vehicle-object-detection-tracking-mobilenetSSD-deepsort-main\iparkpatrol-firebase-adminsdk-k8p3j-9922d874cc.json')
+firebase_admin.initialize_app(cred, {
+    'storageBucket': 'iparkpatrol.appspot.com'  # Ensure this is your actual storage bucket
+})
+db = firestore.client()
+bucket = storage.bucket()
 
 def gather_sequence_info(detections, image):
-    """Gather sequence information, such as image filenames, detections,
-    groundtruth (if available).
-    """
     image_size = image.shape[:2]
     min_frame_idx = 1
     max_frame_idx = 1
     update_ms = 5
-    feature_dim = detections.shape[1] - 10 if detections is not None else 0 #so that only feature vectors (for calculation) are left
+    feature_dim = detections.shape[1] - 10 if detections is not None else 0
     seq_info = {
         "sequence_name": "NA",
         "image_filenames": "NA",
@@ -29,11 +40,8 @@ def gather_sequence_info(detections, image):
     return seq_info
 
 def create_detections(detection_mat, min_height=0, frame_idx=1):
-    """Create detections for given frame index from the raw detection matrix.
-    """
     frame_indices = detection_mat[:, 0].astype(int)
     mask = frame_indices == frame_idx
-
     detection_list = []
     for row in detection_mat[mask]:
         bbox, confidence, feature = row[2:6], row[6], row[10:]
@@ -42,33 +50,65 @@ def create_detections(detection_mat, min_height=0, frame_idx=1):
         detection_list.append(Detection(bbox, confidence, feature))
     return detection_list
 
+def upload_image_to_firebase(image, track_id, unique_id): #Send things to the Firebase Storage datetime.now().isoformat()
+    temp_file, temp_filename = tempfile.mkstemp(suffix='.jpg')
+    try:
+        cv2.imwrite(temp_filename, image)
+        blob = bucket.blob(f'illegal_parking/{datetime.now().isoformat()}_{unique_id}.jpg')
+        blob.upload_from_filename(temp_filename)
+        blob.make_public()
+        return blob.public_url
+    finally:
+        os.close(temp_file)
+        os.remove(temp_filename)
+
+def save_parking_info_to_firestore(track_id, image_url, position, timestamp, unique_id): #Send things to the Firebase Firestore
+    doc_id = f'{timestamp.isoformat()}_{unique_id}'  # Generate a unique document ID
+    doc_ref = db.collection("illegal_parking").document(doc_id)
+    doc_ref.set({
+        "track_id": track_id,
+        "image_url": image_url,
+        "position": position,
+        "timestamp": timestamp.isoformat(),
+        "location": "Sample Location",
+        "title_of_violation": "",
+        "name": "",
+        "address": "",
+        "gender": "",
+        "nationality": "",
+        "licensenumber": "",
+        "expiry": "",
+        "restriction": "",
+        "height": "",
+        "weight": "",
+        "platenumber": "",
+        "make": "",
+        "color": "",
+        "model": "",
+        "marking": ""
+    })
 
 def run(image, detection, config, min_confidence,
         nms_max_overlap, min_detection_height):
-
     img_cpy = image.copy()
     seq_info = gather_sequence_info(detection, img_cpy)
     tracker = config.tracker
 
-    # Run tracker.
-    # Load image and generate detections.
     detections = create_detections(
-        seq_info["detections"], min_detection_height) #has both the image and detections | matting / cropping
+        seq_info["detections"], min_detection_height)
     detections = [d for d in detections if d.confidence >= min_confidence]
     
-    # Run non-maxima suppression.
     boxes = np.array([d.tlwh for d in detections])
     scores = np.array([d.confidence for d in detections])
-    # Check if non_max_suppression is needed again
     indices = preprocessing.non_max_suppression(
         boxes, nms_max_overlap, scores)
     detections = [detections[i] for i in indices]
 
-    # Update tracker.
     tracker.predict()
     tracker.update(detections)
 
-    object_timer(tracker.tracks, config)
+    object_timer(tracker.tracks, config, img_cpy)
+
     draw_trackers(tracker.tracks, img_cpy)
 
 def run_deep_sort(image, detection, config):
@@ -77,31 +117,34 @@ def run_deep_sort(image, detection, config):
     min_detection_height = 0.0
     run(image, detection, config, min_confidence, nms_max_overlap, min_detection_height)
 
-def object_timer(tracks, config):
+def object_timer(tracks, config, image):
     current_time = datetime.now()
     for track in tracks:
-        track_id = track.track_id
+        track_id = str(track.track_id)  # Ensure track_id is a string
         if not track.is_confirmed() or track.time_since_update > 0:
             continue
         if track_id not in config.track_start_time:
-            config.track_start_time[track_id] = (current_time, track.to_tlwh()) # Store start time and initial position
+            config.track_start_time[track_id] = (current_time, track.to_tlwh())
         else:
             start_time, initial_position = config.track_start_time[track_id]
             elapsed_time = current_time - start_time
             current_position = track.to_tlwh()
-            # Check if the object's position has remained relatively constant
-            if np.linalg.norm(np.array(initial_position[:2]) - np.array(current_position[:2])) < 10:  # You can adjust this threshold as needed
-                if elapsed_time.total_seconds() >= 4:  # Adjust this threshold as needed
-                    print("Illegal Parking Detected:", track_id)
-                    # Reset the start time for the track
+            if np.linalg.norm(np.array(initial_position[:2]) - np.array(current_position[:2])) < 10:
+                if elapsed_time.total_seconds() > 60:
+                    if track_id not in config.screenshotted_tracks:
+                        print("Illegal Parking Detected:", track_id)
+                        unique_id = uuid.uuid4().hex  # Generate unique ID
+                        image_url = upload_image_to_firebase(image, track_id, unique_id)
+                        save_parking_info_to_firestore(track_id, image_url, current_position.tolist(), current_time, unique_id)
+                        config.screenshotted_tracks.add(track_id)
                     del config.track_start_time[track_id]
             else:
-                # Object moved, reset start time and initial position
                 config.track_start_time[track_id] = (current_time, current_position)
 
 class DeepSORTConfig:
     def __init__(self, max_cosine_distance=0.2, nn_budget=100):
         metric = nn_matching.NearestNeighborDistanceMetric("cosine", max_cosine_distance, nn_budget)
-        self.tracker = Tracker(metric)  # This is the tracker variable | Very Important
+        self.tracker = Tracker(metric)
         self.results = []
         self.track_start_time = {}
+        self.screenshotted_tracks = set()  # Add a set to keep track of screenshotted tracks

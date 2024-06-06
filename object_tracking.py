@@ -6,14 +6,14 @@ from deep_sort.application_util.visualization import cv2
 
 import numpy as np
 
-cap = cv2.VideoCapture("Labrador_Luxe.mp4")
+cap = cv2.VideoCapture("Pabayo_Sarfiel.mp4")
 
 roi_points = []
 points = 0
 
 def printCoordinate(event, x ,y, flags, params):
     global points, roi_points
-
+    
     if event==cv2.EVENT_LBUTTONDOWN:
         if points < 4:
             roi_points.append((x, y))
@@ -26,7 +26,7 @@ def printCoordinate(event, x ,y, flags, params):
 
 #create a blank frame so that we dont get an error on printCoordinate 
     #because there is no frame at the start of the program
-ret, frame = cap.read()
+ret, frame = cap.read() 
 blank_frame = np.zeros_like(frame)
 
 cv2.imshow('frame', blank_frame) 
