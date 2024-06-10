@@ -5,7 +5,7 @@
 This application is an implementation of People tracking using Tensorflow implementation of MobileNet V3 + SSD[1] and DeepSort[2]. This could very well be extended to any other objects for tracking like cars or animals.
 
 ### Approach
-1. Find bounding box using MobileNet V3 + SSD of people in the frame
+1. Find bounding box using MobileNet V2 + SSD of people in the frame
 2. Extract features(128 dim) of the people detected in step 1 using a CNN.
 3. Estimate trajectory of the person using Kalman Filter.
 4. Assign person id :
@@ -32,7 +32,7 @@ python object_tracking.py file_dir
 
 ## References
 
-Pre-trained Mobilenet file at https://tfhub.dev/google/openimages_v4/ssd/mobilenet_v2/1
+Pre-trained Mobilenet file at http://download.tensorflow.org/models/object_detection/tf2/20200711/ssd_mobilenet_v2_fpnlite_320x320_coco17_tpu-8.tar.gz
 
 <a id="1">[1]</a> 
 M Sandler (2018). 
@@ -51,9 +51,10 @@ Simple Online and Realtime Tracking with a Deep Association Metric [arxiv link](
 <a id="1">[6]</a> Python Tutorial | How to calculate time difference in hours, minutes, and seconds: https://www.youtube.com/watch?v=haC7eG-u2yQ
 
 ## Requirement
-- Python3 >= 2.12.0
+- Python3 9 to 2.12.0
 - TensorFlow >= 2.16
 - OpenCV
 - Pillow == 9.5.0
 - Scipy
 - Tensorflow hub
+- object_detection_api

@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 from mobile_net import *
 
-cap = cv2.VideoCapture("30 Minutes of Cars Driving By in 2009.mp4")
+cap = cv2.VideoCapture("vehicle-object-detection-tracking-mobilenetSSD-deepsort\Test This 00.mp4")
 
 model = ObjectRecognition()
 

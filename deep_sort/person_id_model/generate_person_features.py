@@ -138,6 +138,6 @@ def generate_detections(encoder, boxes, image):
     return np.array(detections_out)
 
 def init_encoder():
-    model_file = './deep_sort/person_id_model/model_file/mars-small128.pb'
+    model_file = 'vehicle-object-detection-tracking-mobilenetSSD-deepsort\deep_sort\person_id_model\model_file\mars-small128.pb'
     encoder = create_box_encoder(model_file, batch_size=1)
     return encoder

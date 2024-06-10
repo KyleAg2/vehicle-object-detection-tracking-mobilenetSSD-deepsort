@@ -157,29 +157,21 @@ def class_name_conversion(classes, category_index=None):
   return class_name
 
 def run_inference_for_single_image(model, image):
+    if image is None:
+        raise ValueError("Input image is None.")
+    
     image = np.asarray(image)
-    # The input needs to be a tensor, convert it using `tf.convert_to_tensor`.
     input_tensor = tf.convert_to_tensor(image)
-    # The model expects a batch of images, so add an axis with `tf.newaxis`.
     input_tensor = input_tensor[tf.newaxis,...]
     
-    # Run inference
     output_dict = model(input_tensor)
-
-    # All outputs are batches tensors.
-    # Convert to numpy arrays, and take index [0] to remove the batch dimension.
-    # We're only interested in the first num_detections.
     num_detections = int(output_dict.pop('num_detections'))
     output_dict = {key: value[0, :num_detections].numpy()
                    for key, value in output_dict.items()}
     output_dict['num_detections'] = num_detections
-
-    # detection_classes should be ints.
     output_dict['detection_classes'] = output_dict['detection_classes'].astype(np.int64)
-   
-    # Handle models with masks:
+
     if 'detection_masks' in output_dict:
-        # Reframe the the bbox mask to the image size.
         detection_masks_reframed = utils_ops.reframe_box_masks_to_image_masks(
                                     output_dict['detection_masks'], output_dict['detection_boxes'],
                                     image.shape[0], image.shape[1])      
@@ -188,11 +180,12 @@ def run_inference_for_single_image(model, image):
     
     return output_dict
 
+
 #===========================================================================================================
 
 class ObjectRecognition:
     def __init__(self):
-        module_handle = tf.saved_model.load("saved_model(custom)v3")
+        module_handle = tf.saved_model.load("vehicle-object-detection-tracking-mobilenetSSD-deepsort\saved_model(custom)v3")
         self.model = module_handle
         #self.category_index = label_map_util.create_category_index_from_labelmap("Cars_label_map.pbtxt", use_display_name=True)
 

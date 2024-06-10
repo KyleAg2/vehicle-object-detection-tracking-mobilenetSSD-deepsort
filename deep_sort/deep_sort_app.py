@@ -14,7 +14,7 @@ import os
 import uuid
 
 # Firebase setup
-cred = credentials.Certificate('vehicle-object-detection-tracking-mobilenetSSD-deepsort-main\iparkpatrol-firebase-adminsdk-k8p3j-9922d874cc.json')
+cred = credentials.Certificate('vehicle-object-detection-tracking-mobilenetSSD-deepsort/iparkpatrol-firebase-adminsdk-k8p3j-e9ac324632.json')
 firebase_admin.initialize_app(cred, {
     'storageBucket': 'iparkpatrol.appspot.com'  # Ensure this is your actual storage bucket
 })
@@ -71,7 +71,7 @@ def save_parking_info_to_firestore(track_id, image_url, position, timestamp, uni
         "position": position,
         "timestamp": timestamp.isoformat(),
         "location": "Sample Location",
-        "title_of_violation": "",
+        "title_of_violation": "Illegal Parking",
         "name": "",
         "address": "",
         "gender": "",
@@ -85,7 +85,9 @@ def save_parking_info_to_firestore(track_id, image_url, position, timestamp, uni
         "make": "",
         "color": "",
         "model": "",
-        "marking": ""
+        "marking": "",
+        "status": "Pending",
+        "enforcerId": ""
     })
 
 def run(image, detection, config, min_confidence,
@@ -129,10 +131,19 @@ def object_timer(tracks, config, image):
             start_time, initial_position = config.track_start_time[track_id]
             elapsed_time = current_time - start_time
             current_position = track.to_tlwh()
-            if np.linalg.norm(np.array(initial_position[:2]) - np.array(current_position[:2])) < 10:
+            
+            # Print the duration for which the vehicle has been detected
+            print(f"Vehicle {track_id} timer: {elapsed_time.total_seconds():.2f} seconds")
+
+            if np.linalg.norm(np.array(initial_position[:2]) - np.array(current_position[:2])) < 20:  # Increase position threshold
                 if elapsed_time.total_seconds() > 60:
                     if track_id not in config.screenshotted_tracks:
                         print("Illegal Parking Detected:", track_id)
+                        
+                        # Draw bounding box around the detected vehicle
+                        bbox = track.to_tlwh()
+                        x, y, w, h = map(int, bbox)
+                        cv2.rectangle(image, (x, y), (x + w, y + h), (0, 0, 255), 2)  # Red color bounding box
                         unique_id = uuid.uuid4().hex  # Generate unique ID
                         image_url = upload_image_to_firebase(image, track_id, unique_id)
                         save_parking_info_to_firestore(track_id, image_url, current_position.tolist(), current_time, unique_id)
